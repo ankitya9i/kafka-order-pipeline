@@ -1,0 +1,27 @@
+{
+  "name": "kafka-order-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "services/*"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f kafka",
+    "topics:create": "node scripts/create-topics.mjs",
+    "db:migrate": "npm -w services/order run db:migrate && npm -w services/inventory run db:migrate",
+    "build": "npm run build --workspaces --if-present",
+    "dev:order": "npm -w services/order run dev",
+    "dev:payment": "npm -w services/payment run dev",
+    "dev:inventory": "npm -w services/inventory run dev",
+    "dev:notification": "npm -w services/notification run dev",
+    "dev:all": "concurrently -n order,payment,inventory,notification \"npm run dev:order\" \"npm run dev:payment\" \"npm run dev:inventory\" \"npm run dev:notification\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}

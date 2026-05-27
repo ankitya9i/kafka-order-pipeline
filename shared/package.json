@@ -1,0 +1,29 @@
+{
+  "name": "@pipeline/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./schemas": "./dist/schemas.js",
+    "./kafka": "./dist/kafka.js",
+    "./idempotency": "./dist/idempotency.js",
+    "./logger": "./dist/logger.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "kafkajs": "^2.2.4",
+    "pino": "^9.5.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  }
+}
