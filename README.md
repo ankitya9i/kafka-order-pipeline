@@ -7,29 +7,34 @@ This repo is a learning project intended to be a defensible, end-to-end example 
 ## Architecture
 
 ```
-                                             ┌─────────────────────┐
-                                             │   Inventory Service │ → inventory.reserved / inventory.failed
-                                             ├─────────────────────┤
- Order Service ──[orders.created]──────────▶ │   Payment Service   │ → payment.processed / payment.failed
-       ▲                                     ├─────────────────────┤
-       │ saga orchestration                  │ Notification Service│ → notification.sent
-       │ (listens to all reply topics,       └─────────────────────┘
-       │  updates Order state)                              │
-       │                                                    │
-       └────────────────────────────────────────────────────┘
-                                                            │ on any handler failure after retries
-                                                            ▼
-                                                  ┌──────────────────┐
-                                                  │   orders.dlq     │  separate consumer for replay
-                                                  └──────────────────┘
+ ┌──────────────┐                                                                                          ┌──────────────┐
+ │ Order Service│──[orders.created]──▶ Inventory ──[inventory.reserved]──▶ Payment ──[payment.processed]──▶│ Notification │
+ │  (REST API + │         │                  │                                  │                          └──────┬───────┘
+ │  saga state) │         │                  └──[inventory.failed]──┐           └──[payment.failed]──┐            │
+ │              │         │                                         │                                │            │
+ │              │ ◀───────┴──── reply events (saga state updates) ──┴────────────────────────────────┴─[notification.sent]
+ └──────────────┘
+       │
+       │ On any handler failure after retries → orders.dlq
+       ▼
+ ┌────────────┐
+ │ orders.dlq │  poison-message archive, separate consumer for replay
+ └────────────┘
 ```
 
 Each downstream service:
-- Consumes `orders.created` (partitioned by `userId`).
+- Subscribes to its **input topic** in the saga chain (see below).
 - Validates the message against a **Zod schema**; bad messages go to DLQ.
 - Performs an **idempotency check** using Redis (`SET key NX EX`) keyed by `(consumerGroup, eventId)`.
 - On handler error, retries with **exponential backoff** (3 attempts: ~1s, 2s, 4s). On terminal failure, the message goes to the DLQ.
 - Emits a **reply event** on its result topic.
+
+| Service | Consumes | Produces |
+|---|---|---|
+| Inventory | `orders.created` | `inventory.reserved`, `inventory.failed` |
+| Payment | `inventory.reserved` | `payment.processed`, `payment.failed` |
+| Notification | `payment.processed` | `notification.sent` |
+| Order (saga) | all five reply topics | `orders.created` (from REST), `orders.dlq` (on terminal failure) |
 
 The Order Service is the **saga orchestrator**: it owns the order state machine and advances it as reply events arrive.
 
